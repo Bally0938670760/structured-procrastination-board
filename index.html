@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>結構化拖延任務板</title>
+	<meta name="description" content="結構化拖延任務管理工具">
+	<meta name="theme-color" content="#151a20">
+	<link rel="manifest" href="manifest.json">
+	<style>
+	:root{
+		--bg:#0f1216;--panel:#151a20;--panel-2:#1b222b;--text:#e6edf3;--muted:#9aa6b2;--border:#283241;
+		--red:#ef4444;--yellow:#f59e0b;--green:#22c55e;--blue:#3b82f6;
+	}
+	*{box-sizing:border-box} html,body{height:100%}
+	body{margin:0;background:linear-gradient(180deg,#0e131a,#0b0f14);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+	.app-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;z-index:5}
+	h1{margin:0;font-size:18px}
+	.actions{display:flex;gap:8px}
+	.actions button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px}
+	.actions button:hover{filter:brightness(1.05)}
+	.actions button.secondary{background:var(--panel-2);border:1px solid var(--border)}
+	.board{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:12px;padding:16px;align-items:start}
+	.column{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:200px}
+	.column-header{display:flex;align-items:center;justify-content:space-between;padding:12px 12px;border-bottom:1px solid var(--border);background:var(--panel-2);flex-wrap:wrap;gap:8px}
+	.column-title{display:flex;gap:8px;align-items:center}
+	.column-title .emoji{font-size:18px}
+	.column-title h2{margin:0;font-size:14px}
+	.column-hint{color:var(--muted);font-size:12px;margin:6px 12px 0 12px}
+	.sort-controls{display:flex;gap:6px;margin-left:auto}
+	.sort-btn{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px;white-space:nowrap}
+	.sort-btn:hover{background:var(--panel-2)}
+	.sort-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+	.task-list{padding:12px;display:flex;flex-direction:column;gap:10px;min-height:140px}
+	.task{background:#0e1622;border:1px solid var(--border);border-radius:10px;padding:10px;gap:8px;display:flex;flex-direction:column}
+	.task[dragging]{opacity:.6}
+	.task-top{display:flex;gap:8px;align-items:center}
+	.task-title{flex:1;background:transparent;border:0;border-bottom:1px dashed var(--border);color:var(--text);padding:4px 2px;outline:none}
+	.task-row{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center}
+	.task-row label{color:var(--muted);font-size:12px}
+	.task-status,.task-priority{width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+	.priority-dot{width:10px;height:10px;border-radius:50%;background:var(--yellow);box-shadow:0 0 0 2px #0003 inset}
+	.subtasks{display:flex;flex-direction:column;gap:6px}
+	.subtasks-header{display:flex;align-items:center;justify-content:space-between}
+	.subtasks-header label{color:var(--muted);font-size:12px}
+	.add-subtask{background:#263244;color:#cfe1ff;border:1px dashed #37517a;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px}
+	.subtasks-list{display:flex;flex-direction:column;gap:6px}
+	.subtask{display:flex;align-items:center;gap:8px;background:#0b1320;border:1px solid var(--border);border-radius:8px;padding:6px 8px;flex-wrap:wrap}
+	.subtask input[type="text"]{flex:1;min-width:100px;background:transparent;border:0;border-bottom:1px dashed var(--border);color:var(--text);outline:none;padding:2px}
+	.subtask input[type="checkbox"]{cursor:pointer}
+	.subtask .time-display{min-width:78px;font-family:monospace;background:#131d2b;border:1px solid #263244;border-radius:6px;padding:4px 6px;text-align:center;font-size:12px;color:#b8d4ff}
+	.subtask .time-btn{background:#223049;color:#d6e4ff;border:1px solid #32476b;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;white-space:nowrap}
+	.subtask .time-btn.stop{background:#4c1f28;border-color:#6c2c39;color:#ffd4d4}
+	.subtask .time-btn:disabled{opacity:.5;cursor:default}
+	.subtask .remove-sub{background:transparent;border:0;color:#9fb4ff;cursor:pointer;padding:4px;font-size:14px}
+	.task-note{width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;resize:vertical}
+	.task-footer{display:flex;justify-content:flex-end;gap:8px}
+	.delete-task{background:#221416;border:1px solid #51222a;color:#ffc3c3;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
+	.delete-task:hover{filter:brightness(1.08)}
+	.add-task-btn{background:#1b2431;border:1px solid var(--border);color:#dbe7ff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;margin:8px 12px}
+	.add-task-btn:hover{background:var(--panel-2)}
+	.add-form{margin:8px 12px 12px 12px;padding:10px;border:1px dashed var(--border);border-radius:10px;background:#0c1219;display:grid;gap:8px}
+	.add-form input,.add-form textarea,.add-form select{width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+	.add-form .actions{display:flex;gap:8px}
+	.add-form button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#1b2431;color:#dbe7ff;padding:6px 10px}
+	.add-form button.primary{background:var(--blue);color:#fff;border:0}
+	@media (max-width:1200px){.board{grid-template-columns:repeat(3,minmax(240px,1fr))}}
+	@media (max-width:800px){.board{grid-template-columns:repeat(2,minmax(240px,1fr))}}
+	@media (max-width:560px){
+		.board{grid-template-columns:1fr}
+		.app-header{flex-direction:column;align-items:flex-start;gap:8px}
+		.actions{width:100%;justify-content:space-between}
+		.sort-controls{width:100%;justify-content:flex-end}
+	}
+	</style>
+</head>
+<body>
+	<header class="app-header">
+		<h1>《結構化拖延任務板》</h1>
+		<div class="actions">
+			<button id="addTaskBtn" class="secondary">＋ 新增任務</button>
+			<button id="resetBtn" title="清除本地資料並載入範例">重置為範例</button>
+		</div>
+	</header>
+
+	<main id="board" class="board"></main>
+
+	<template id="task-template">
+		<div class="task" draggable="true">
+			<div class="task-top">
+				<div class="priority-dot" title="優先度"></div>
+				<input class="task-title" placeholder="任務名稱">
+			</div>
+
+			<div class="task-row">
+				<label>狀態</label>
+				<select class="task-status">
+					<option>⏳ 尚未開始</option>
+					<option>🔄 進行中</option>
+					<option>✅ 完成</option>
+				</select>
+			</div>
+
+			<div class="task-row">
+				<label>優先度</label>
+				<select class="task-priority">
+					<option>🔴 高優先（緊急 & 重要）</option>
+					<option>🟡 中優先（次要）</option>
+					<option>🟢 低優先（輕鬆小事）</option>
+				</select>
+			</div>
+
+			<div class="subtasks">
+				<div class="subtasks-header">
+					<label>子步驟清單</label>
+					<button class="add-subtask" title="新增子步驟">＋</button>
+				</div>
+				<div class="subtasks-list"></div>
+			</div>
+
+			<div class="task-row">
+				<label>備註</label>
+				<textarea class="task-note" rows="2" placeholder="補充說明..."></textarea>
+			</div>
+
+			<div class="task-footer">
+				<button class="delete-task">刪除</button>
+			</div>
+		</div>
+	</template>
+
+	<div id="addTaskModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+		<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:400px;width:90%;max-height:90vh;overflow-y:auto">
+			<h3 style="margin-top:0">新增任務</h3>
+			<div style="display:grid;gap:12px">
+				<div>
+					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">類別</label>
+					<select id="modal-category" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></select>
+				</div>
+				<div>
+					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">任務名稱</label>
+					<input id="modal-title" type="text" placeholder="任務名稱" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px">
+				</div>
+				<div>
+					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">狀態</label>
+					<select id="modal-status" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></select>
+				</div>
+				<div>
+					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">優先度</label>
+					<select id="modal-priority" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></select>
+				</div>
+				<div>
+					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">備註</label>
+					<textarea id="modal-note" rows="3" placeholder="備註（可留空）" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;resize:vertical"></textarea>
+				</div>
+				<div style="display:flex;gap:8px;justify-content:flex-end">
+					<button id="modal-cancel" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 16px;cursor:pointer">取消</button>
+					<button id="modal-submit" style="background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer">新增</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+	const CATEGORIES = [
+		{ key:'pressure',  emoji:'🧨', title:'高壓督察任務', hint:'放在清單最上面，成為心理"壓力源"' },
+		{ key:'simple',    emoji:'🛠', title:'較簡任務',     hint:'趁著「逃避」大任務時完成，可產生成就感' },
+		{ key:'support',   emoji:'📚', title:'支援任務',     hint:'側面推進主任務' },
+		{ key:'fuzzy',     emoji:'☁️', title:'模糊任務',     hint:'拖延時當備案、低壓執行' },
+	];
+	const STATUS = ['⏳ 尚未開始','🔄 進行中','✅ 完成'];
+	const PRIORITY = ['🔴 高優先（緊急 & 重要）','🟡 中優先（次要）','🟢 低優先（輕鬆小事）'];
+	const LS_KEY = 'structured-procrastination-board.v1';
+	const SORT_KEY = 'task-sort-mode.v1';
+
+	// 計時器管理
+	const activeTimers = new Map();
+	const taskElements = new Map(); // 儲存任務 DOM 元素，避免重新渲染時丟失狀態
+
+	// 排序模式：'manual' | 'priority-high' | 'priority-low'
+	let sortModes = {};
+	try{
+		const saved = localStorage.getItem(SORT_KEY);
+		if(saved) sortModes = JSON.parse(saved);
+	}catch{}
+
+	function formatDuration(ms){
+		const totalSeconds = Math.floor(ms / 1000);
+		const s = totalSeconds % 60;
+		const m = Math.floor(totalSeconds / 60) % 60;
+		const h = Math.floor(totalSeconds / 3600);
+		return [h,m,s].map(v=>String(v).padStart(2,'0')).join(':');
+	}
+
+	function currentElapsed(st){
+		if(st.running && st.startedAt){
+			return st.elapsedMs + (Date.now() - st.startedAt);
+		}
+		return st.elapsedMs;
+	}
+
+	function clearTimerInterval(id){
+		const handle = activeTimers.get(id);
+		if(handle){
+			clearInterval(handle);
+			activeTimers.delete(id);
+		}
+	}
+
+	function startSubtaskTimer(task, st, display, startBtn, stopBtn){
+		if(st.running) return;
+		st.running = true;
+		st.startedAt = Date.now();
+		persist();
+		const update = ()=>{ display.textContent = formatDuration(currentElapsed(st)); };
+		update();
+		clearTimerInterval(st.id);
+		const handle = setInterval(update, 1000);
+		activeTimers.set(st.id, handle);
+		startBtn.disabled = true;
+		stopBtn.disabled = false;
+	}
+
+	function stopSubtaskTimer(st, display, startBtn, stopBtn){
+		if(!st.running) return;
+		const now = Date.now();
+		st.elapsedMs += now - (st.startedAt ?? now);
+		st.running = false;
+		st.startedAt = null;
+		clearTimerInterval(st.id);
+		display.textContent = formatDuration(st.elapsedMs);
+		startBtn.disabled = false;
+		stopBtn.disabled = true;
+		persist();
+	}
+
+	function getPriorityValue(priority){
+		if(priority.startsWith('🔴')) return 3;
+		if(priority.startsWith('🟡')) return 2;
+		if(priority.startsWith('🟢')) return 1;
+		return 0;
+	}
+
+	function seedData(){
+		return [
+			{
+				id: crypto.randomUUID(),
+				category:'pressure',
+				title:'提案簡報',
+				status:'⏳ 尚未開始',
+				priority:'🔴 高優先（緊急 & 重要）',
+				note:'放在最上面，形成心理壓力牆',
+				subtasks:[
+					{ id:crypto.randomUUID(), text:'收資料', done:false, elapsedMs:0, running:false, startedAt:null },
+					{ id:crypto.randomUUID(), text:'擬大綱', done:false, elapsedMs:0, running:false, startedAt:null },
+				],
+				order:0
+			},
+			{
+				id: crypto.randomUUID(),
+				category:'simple',
+				title:'整理桌面（整理提案資料夾）',
+				status:'🔄 進行中',
+				priority:'🟡 中優先（次要）',
+				note:'逃避主任務時的替代品',
+				subtasks:[
+					{ id:crypto.randomUUID(), text:'分類筆', done:false, elapsedMs:0, running:false, startedAt:null },
+					{ id:crypto.randomUUID(), text:'擦螢幕', done:false, elapsedMs:0, running:false, startedAt:null },
+				],
+				order:0
+			},
+			{
+				id: crypto.randomUUID(),
+				category:'support',
+				title:'找兩份參考資料',
+				status:'⏳ 尚未開始',
+				priority:'🟡 中優先（次要）',
+				note:'',
+				subtasks:[
+					{ id:crypto.randomUUID(), text:'找論文', done:false, elapsedMs:0, running:false, startedAt:null },
+					{ id:crypto.randomUUID(), text:'整理標題摘要', done:false, elapsedMs:0, running:false, startedAt:null },
+				],
+				order:0
+			},
+			{
+				id: crypto.randomUUID(),
+				category:'fuzzy',
+				title:'構思方向（思考下一步計劃）',
+				status:'✅ 完成',
+				priority:'🟡 中優先（次要）',
+				note:'',
+				subtasks:[
+					{ id:crypto.randomUUID(), text:'列出選項', done:true, elapsedMs:0, running:false, startedAt:null },
+					{ id:crypto.randomUUID(), text:'預想情境', done:true, elapsedMs:0, running:false, startedAt:null },
+				],
+				order:0
+			},
+		];
+	}
+
+	function normalizeTasks(list){
+		return list.map(task=>{
+			if(task.category === 'simple1' || task.category === 'simple2'){
+				task.category = 'simple';
+			}
+			// 確保每個子步驟都有完整的計時欄位
+			task.subtasks = (task.subtasks||[]).map(st=>({
+				id: st.id ?? crypto.randomUUID(),
+				text: st.text ?? '',
+				done: !!st.done,
+				elapsedMs: Number.isFinite(st.elapsedMs) ? st.elapsedMs : 0,
+				running: !!st.running,
+				startedAt: typeof st.startedAt === 'number' ? st.startedAt : null
+			}));
+			return task;
+		});
+	}
+
+	const store = {
+		load(){
+			try{
+				const raw = localStorage.getItem(LS_KEY);
+				if(!raw) return seedData();
+				const parsed = JSON.parse(raw);
+				return Array.isArray(parsed) ? parsed : seedData();
+			}catch{ return seedData(); }
+		},
+		save(data){ 
+			localStorage.setItem(LS_KEY, JSON.stringify(normalizeTasks(data))); 
+		}
+	};
+
+	let tasks = normalizeTasks(store.load());
+
+	const el = {
+		board: document.getElementById('board'),
+		taskTpl: document.getElementById('task-template'),
+		resetBtn: document.getElementById('resetBtn'),
+		addTaskBtn: document.getElementById('addTaskBtn'),
+		modal: document.getElementById('addTaskModal'),
+		modalCategory: document.getElementById('modal-category'),
+		modalTitle: document.getElementById('modal-title'),
+		modalStatus: document.getElementById('modal-status'),
+		modalPriority: document.getElementById('modal-priority'),
+		modalNote: document.getElementById('modal-note'),
+		modalSubmit: document.getElementById('modal-submit'),
+		modalCancel: document.getElementById('modal-cancel'),
+	};
+
+	function priorityColor(p){
+		const css = getComputedStyle(document.documentElement);
+		if(p.startsWith('🔴')) return css.getPropertyValue('--red');
+		if(p.startsWith('🟢')) return css.getPropertyValue('--green');
+		return css.getPropertyValue('--yellow');
+	}
+
+	function saveSortMode(category, mode){
+		sortModes[category] = mode;
+		try{
+			localStorage.setItem(SORT_KEY, JSON.stringify(sortModes));
+		}catch{}
+	}
+
+	function getSortedTasks(catKey, taskList){
+		const mode = sortModes[catKey] || 'manual';
+		if(mode === 'manual'){
+			return [...taskList].sort((a,b)=>a.order - b.order || a.title.localeCompare(b.title,'zh-Hant'));
+		}else if(mode === 'priority-high'){
+			return [...taskList].sort((a,b)=>{
+				const prioDiff = getPriorityValue(b.priority) - getPriorityValue(a.priority);
+				if(prioDiff !== 0) return prioDiff;
+				return a.order - b.order || a.title.localeCompare(b.title,'zh-Hant');
+			});
+		}else if(mode === 'priority-low'){
+			return [...taskList].sort((a,b)=>{
+				const prioDiff = getPriorityValue(a.priority) - getPriorityValue(b.priority);
+				if(prioDiff !== 0) return prioDiff;
+				return a.order - b.order || a.title.localeCompare(b.title,'zh-Hant');
+			});
+		}
+		return taskList;
+	}
+
+	function render(){
+		el.board.innerHTML = '';
+		taskElements.clear();
+		
+		CATEGORIES.forEach(cat=>{
+			const col = document.createElement('section');
+			col.className='column';
+			col.dataset.category = cat.key;
+
+			const header = document.createElement('div');
+			header.className='column-header';
+			header.innerHTML = `
+				<div class="column-title">
+					<span class="emoji">${cat.emoji}</span>
+					<h2>${cat.title}</h2>
+				</div>
+				<div class="sort-controls">
+					<button class="sort-btn ${(sortModes[cat.key] || 'manual') === 'manual' ? 'active' : ''}" data-mode="manual" data-cat="${cat.key}" title="手動排序">手動</button>
+					<button class="sort-btn ${sortModes[cat.key] === 'priority-high' ? 'active' : ''}" data-mode="priority-high" data-cat="${cat.key}" title="優先級：高→低">高→低</button>
+					<button class="sort-btn ${sortModes[cat.key] === 'priority-low' ? 'active' : ''}" data-mode="priority-low" data-cat="${cat.key}" title="優先級：低→高">低→高</button>
+				</div>
+			`;
+
+			// 排序按鈕事件
+			header.querySelectorAll('.sort-btn').forEach(btn=>{
+				btn.addEventListener('click', ()=>{
+					const mode = btn.dataset.mode;
+					const catKey = btn.dataset.cat;
+					saveSortMode(catKey, mode);
+					// 更新按鈕狀態
+					header.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+					btn.classList.add('active');
+					// 重新渲染該欄位
+					const list = col.querySelector('.task-list');
+					if(list){
+						list.innerHTML = '';
+						getSortedTasks(catKey, tasks.filter(t=>t.category===catKey)).forEach(t=>{
+							list.appendChild(renderTask(t));
+						});
+					}
+				});
+			});
+
+			col.appendChild(header);
+
+			if(cat.hint){
+				const hint = document.createElement('div');
+				hint.className='column-hint';
+				hint.textContent = cat.hint;
+				col.appendChild(hint);
+			}
+
+			const list = document.createElement('div');
+			list.className='task-list';
+			list.addEventListener('dragover', onListDragOver);
+			list.addEventListener('drop', onListDrop);
+
+			const categoryTasks = tasks.filter(t=>t.category===cat.key);
+			getSortedTasks(cat.key, categoryTasks).forEach(t=>{
+				const taskEl = renderTask(t);
+				list.appendChild(taskEl);
+				taskElements.set(t.id, taskEl);
+			});
+
+			col.appendChild(list);
+			el.board.appendChild(col);
+		});
+	}
+
+	function getTasksByCategory(catKey){
+		return tasks.filter(t=>t.category===catKey);
+	}
+
+	function updateTaskInDOM(task){
+		const taskEl = taskElements.get(task.id);
+		if(!taskEl) return;
+
+		// 更新優先度顏色
+		const dot = taskEl.querySelector('.priority-dot');
+		if(dot) dot.style.background = priorityColor(task.priority);
+
+		// 更新狀態和優先度選擇器
+		const statusSel = taskEl.querySelector('.task-status');
+		if(statusSel && statusSel.value !== task.status) statusSel.value = task.status;
+		const prioSel = taskEl.querySelector('.task-priority');
+		if(prioSel && prioSel.value !== task.priority) prioSel.value = task.priority;
+
+		// 更新標題和備註
+		const title = taskEl.querySelector('.task-title');
+		if(title && title.value !== task.title) title.value = task.title;
+		const note = taskEl.querySelector('.task-note');
+		if(note && note.value !== task.note) note.value = task.note || '';
+
+		// 更新子步驟列表（只更新必要的部分，避免重置狀態）
+		const subtasksList = taskEl.querySelector('.subtasks-list');
+		if(subtasksList){
+			const existingSubtasks = Array.from(subtasksList.children);
+			const currentIds = new Set((task.subtasks||[]).map(st=>st.id));
+
+			// 移除不存在的子步驟
+			existingSubtasks.forEach(el=>{
+				const subId = el.dataset.subId;
+				if(subId && !currentIds.has(subId)){
+					const st = findSubtaskById(task, subId);
+					if(st){
+						stopSubtaskTimer(st, 
+							el.querySelector('.time-display'),
+							el.querySelector('.time-btn.start'),
+							el.querySelector('.time-btn.stop')
+						);
+					}
+					el.remove();
+				}
+			});
+
+			// 添加新的子步驟或更新現有的
+			(task.subtasks||[]).forEach(st=>{
+				const existing = subtasksList.querySelector(`[data-sub-id="${st.id}"]`);
+				if(existing){
+					// 更新現有子步驟的文字和狀態，但保留計時器狀態
+					const txt = existing.querySelector('input[type="text"]');
+					if(txt && txt.value !== st.text) txt.value = st.text;
+					const chk = existing.querySelector('input[type="checkbox"]');
+					if(chk && chk.checked !== st.done) chk.checked = st.done;
+				}else{
+					// 添加新子步驟
+					subtasksList.appendChild(renderSubtask(task, st));
+				}
+			});
+		}
+	}
+
+	function findSubtaskById(task, subId){
+		return (task.subtasks||[]).find(st=>st.id === subId);
+	}
+
+	function renderTask(task){
+		// 檢查是否已有 DOM 元素，如果有且任務數據未變，則重用
+		let node = taskElements.get(task.id);
+		if(node && node.parentElement){
+			updateTaskInDOM(task);
+			return node;
+		}
+
+		node = el.taskTpl.content.firstElementChild.cloneNode(true);
+		node.dataset.id = task.id;
+
+		const title = node.querySelector('.task-title');
+		title.value = task.title;
+		title.addEventListener('input', e=>{
+			task.title = e.target.value.trim();
+			persist();
+		});
+
+		const statusSel = node.querySelector('.task-status');
+		statusSel.value = task.status;
+		statusSel.addEventListener('change', e=>{
+			task.status = e.target.value;
+			persist();
+		});
+
+		const prioSel = node.querySelector('.task-priority');
+		prioSel.value = task.priority;
+		prioSel.addEventListener('change', e=>{
+			task.priority = e.target.value;
+			node.querySelector('.priority-dot').style.background = priorityColor(task.priority);
+			persist();
+			// 如果該欄位使用優先級排序，重新渲染
+			const cat = node.closest('.column')?.dataset.category;
+			if(cat && (sortModes[cat] === 'priority-high' || sortModes[cat] === 'priority-low')){
+				render();
+			}
+		});
+		node.querySelector('.priority-dot').style.background = priorityColor(task.priority);
+
+		const note = node.querySelector('.task-note');
+		note.value = task.note || '';
+		note.addEventListener('input', e=>{
+			task.note = e.target.value;
+			persist();
+		});
+
+		// Subtasks
+		const list = node.querySelector('.subtasks-list');
+		(task.subtasks||[]).forEach(st=> list.appendChild(renderSubtask(task, st)));
+		node.querySelector('.add-subtask').addEventListener('click', ()=>{
+			const st = { id:crypto.randomUUID(), text:'', done:false, elapsedMs:0, running:false, startedAt:null };
+			if(!task.subtasks) task.subtasks = [];
+			task.subtasks.push(st);
+			list.appendChild(renderSubtask(task, st));
+			persist();
+		});
+
+		// Delete
+		node.querySelector('.delete-task').addEventListener('click', ()=>{
+			if(confirm('確定刪除此任務？')){
+				// 停止所有子步驟的計時器
+				(task.subtasks||[]).forEach(st=>{
+					clearTimerInterval(st.id);
+				});
+				tasks = tasks.filter(t=>t.id!==task.id);
+				taskElements.delete(task.id);
+				persist();
+				render();
+			}
+		});
+
+		// DnD
+		node.addEventListener('dragstart', onTaskDragStart);
+		node.addEventListener('dragend', onTaskDragEnd);
+
+		return node;
+	}
+
+	function renderSubtask(task, st){
+		const row = document.createElement('div');
+		row.className='subtask';
+		row.dataset.subId = st.id;
+
+		const chk = document.createElement('input');
+		chk.type='checkbox';
+		chk.checked = !!st.done;
+		chk.addEventListener('change', ()=>{
+			st.done = chk.checked;
+			persist();
+		});
+
+		const txt = document.createElement('input');
+		txt.type='text';
+		txt.placeholder='子步驟...';
+		txt.value = st.text || '';
+		txt.addEventListener('input', ()=>{
+			st.text = txt.value;
+			persist();
+		});
+
+		const display = document.createElement('span');
+		display.className='time-display';
+		display.textContent = formatDuration(currentElapsed(st));
+
+		const startBtn = document.createElement('button');
+		startBtn.className='time-btn start';
+		startBtn.textContent='開始';
+		startBtn.addEventListener('click', ()=>{
+			startSubtaskTimer(task, st, display, startBtn, stopBtn);
+		});
+
+		const stopBtn = document.createElement('button');
+		stopBtn.className='time-btn stop';
+		stopBtn.textContent='停止';
+		stopBtn.addEventListener('click', ()=>{
+			stopSubtaskTimer(st, display, startBtn, stopBtn);
+		});
+
+		const rm = document.createElement('button');
+		rm.className='remove-sub';
+		rm.textContent='✕';
+		rm.title='刪除此子步驟';
+		rm.addEventListener('click', ()=>{
+			if(confirm('刪除這個子步驟？')){
+				stopSubtaskTimer(st, display, startBtn, stopBtn);
+				// 直接從任務的子步驟陣列中移除，不重新渲染整個任務
+				task.subtasks = task.subtasks.filter(s=>s.id!==st.id);
+				row.remove();
+				persist();
+			}
+		});
+
+		if(st.running){
+			startBtn.disabled = true;
+			stopBtn.disabled = false;
+			startSubtaskTimer(task, st, display, startBtn, stopBtn);
+		}else{
+			startBtn.disabled = false;
+			stopBtn.disabled = true;
+		}
+
+		row.appendChild(chk);
+		row.appendChild(txt);
+		row.appendChild(display);
+		row.appendChild(startBtn);
+		row.appendChild(stopBtn);
+		row.appendChild(rm);
+		return row;
+	}
+
+	/* ---------- Modal for Adding Tasks ---------- */
+	function showAddTaskModal(){
+		// 填充類別選項
+		el.modalCategory.innerHTML = '';
+		CATEGORIES.forEach(cat=>{
+			const opt = document.createElement('option');
+			opt.value = cat.key;
+			opt.textContent = `${cat.emoji} ${cat.title}`;
+			el.modalCategory.appendChild(opt);
+		});
+
+		// 填充狀態選項
+		el.modalStatus.innerHTML = '';
+		STATUS.forEach(s=>{
+			const opt = document.createElement('option');
+			opt.textContent = s;
+			el.modalStatus.appendChild(opt);
+		});
+
+		// 填充優先度選項
+		el.modalPriority.innerHTML = '';
+		PRIORITY.forEach(p=>{
+			const opt = document.createElement('option');
+			opt.textContent = p;
+			el.modalPriority.appendChild(opt);
+		});
+
+		// 重置表單
+		el.modalTitle.value = '';
+		el.modalNote.value = '';
+		el.modalCategory.selectedIndex = 0;
+		el.modalStatus.selectedIndex = 0;
+		el.modalPriority.selectedIndex = 0;
+
+		el.modal.style.display = 'flex';
+	}
+
+	function hideAddTaskModal(){
+		el.modal.style.display = 'none';
+	}
+
+	el.addTaskBtn.addEventListener('click', showAddTaskModal);
+	el.modalCancel.addEventListener('click', hideAddTaskModal);
+	el.modalSubmit.addEventListener('click', ()=>{
+		const title = el.modalTitle.value.trim();
+		if(!title){
+			alert('請輸入任務名稱');
+			return;
+		}
+		const category = el.modalCategory.value;
+		const t = {
+			id: crypto.randomUUID(),
+			category,
+			title,
+			status: el.modalStatus.value,
+			priority: el.modalPriority.value,
+			note: el.modalNote.value,
+			subtasks: [],
+			order: (getTasksByCategory(category).length > 0 ? Math.max(...getTasksByCategory(category).map(t=>t.order)) + 1 : 0)
+		};
+		tasks.push(t);
+		persist();
+		hideAddTaskModal();
+		render();
+	});
+
+	el.modal.addEventListener('click', (e)=>{
+		if(e.target === el.modal){
+			hideAddTaskModal();
+		}
+	});
+
+	/* ---------- Drag & Drop ---------- */
+	let dragCtx = { id:null };
+
+	function onTaskDragStart(e){
+		const id = e.currentTarget.dataset.id;
+		dragCtx.id = id;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', id);
+		e.currentTarget.setAttribute('dragging','');
+	}
+
+	function onTaskDragEnd(e){
+		e.currentTarget.removeAttribute('dragging');
+		dragCtx.id = null;
+	}
+
+	function onListDragOver(e){
+		e.preventDefault();
+		const list = e.currentTarget;
+		const after = getDragAfterElement(list, e.clientY);
+		const dragging = document.querySelector('.task[dragging]');
+		if(!dragging) return;
+		if(after == null){
+			list.appendChild(dragging);
+		}else{
+			list.insertBefore(dragging, after);
+		}
+	}
+
+	function onListDrop(e){
+		e.preventDefault();
+		const list = e.currentTarget;
+		const col = list.closest('.column');
+		const category = col.dataset.category;
+		const orderMap = Array.from(list.querySelectorAll('.task')).map((node, idx)=>({
+			id: node.dataset.id,
+			order: idx
+		}));
+
+		// Update task positions and categories
+		orderMap.forEach(({id, order})=>{
+			const t = tasks.find(x=>x.id===id);
+			if(t){
+				t.order = order;
+				t.category = category;
+			}
+		});
+		persist();
+		
+		// 如果該欄位使用優先級排序，重新渲染以應用排序
+		const mode = sortModes[category];
+		if(mode === 'priority-high' || mode === 'priority-low'){
+			render();
+		}
+	}
+
+	function getDragAfterElement(container, y){
+		const items = [...container.querySelectorAll('.task:not([dragging])')];
+		return items.reduce((closest, child)=>{
+			const box = child.getBoundingClientRect();
+			const offset = y - box.top - box.height/2;
+			if(offset < 0 && offset > closest.offset){
+				return { offset, element: child };
+			}else{
+				return closest;
+			}
+		},{ offset: Number.NEGATIVE_INFINITY, element: null }).element;
+	}
+
+	/* ---------- Persistence & Init ---------- */
+	function persist(){
+		store.save(tasks);
+	}
+
+	function init(){
+		el.resetBtn.addEventListener('click', ()=>{
+			if(confirm('將清除目前資料並載入範例，確定？')){
+				// 停止所有計時器
+				[...activeTimers.values()].forEach(handle=>clearInterval(handle));
+				activeTimers.clear();
+				taskElements.clear();
+				tasks = seedData();
+				persist();
+				render();
+			}
+		});
+
+		window.addEventListener('beforeunload', ()=>{
+			[...activeTimers.values()].forEach(handle=>clearInterval(handle));
+			activeTimers.clear();
+		});
+
+		render();
+	}
+
+	document.addEventListener('DOMContentLoaded', init);
+	</script>
+</body>
+</html>
