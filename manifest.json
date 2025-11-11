@@ -1,0 +1,24 @@
+{
+	"name": "結構化拖延任務板",
+	"short_name": "拖延任務板",
+	"description": "結構化拖延任務管理工具，支援計時功能",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#0f1216",
+	"theme_color": "#151a20",
+	"orientation": "portrait-primary",
+	"icons": [
+		{
+			"src": "icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		}
+	]
+}
