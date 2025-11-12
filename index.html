@@ -16,10 +16,14 @@
 	body{margin:0;background:linear-gradient(180deg,#0e131a,#0b0f14);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
 	.app-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;z-index:5}
 	h1{margin:0;font-size:18px}
-	.actions{display:flex;gap:8px}
+	.actions{display:flex;gap:8px;align-items:center}
 	.actions button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px}
 	.actions button:hover{filter:brightness(1.05)}
 	.actions button.secondary{background:var(--panel-2);border:1px solid var(--border)}
+	#saveStatus{color:var(--muted);font-size:11px;margin-right:4px;min-width:50px;text-align:right}
+	#saveStatus.saving{color:var(--yellow)}
+	#saveStatus.saved{color:var(--green)}
+	#saveStatus.error{color:var(--red)}
 	.board{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:12px;padding:16px;align-items:start}
 	.column{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:200px}
 	.column-header{display:flex;align-items:center;justify-content:space-between;padding:12px 12px;border-bottom:1px solid var(--border);background:var(--panel-2);flex-wrap:wrap;gap:8px}
@@ -57,13 +61,20 @@
 	.task-footer{display:flex;justify-content:flex-end;gap:8px}
 	.delete-task{background:#221416;border:1px solid #51222a;color:#ffc3c3;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
 	.delete-task:hover{filter:brightness(1.08)}
-	.add-task-btn{background:#1b2431;border:1px solid var(--border);color:#dbe7ff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px;margin:8px 12px}
-	.add-task-btn:hover{background:var(--panel-2)}
 	.add-form{margin:8px 12px 12px 12px;padding:10px;border:1px dashed var(--border);border-radius:10px;background:#0c1219;display:grid;gap:8px}
 	.add-form input,.add-form textarea,.add-form select{width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
 	.add-form .actions{display:flex;gap:8px}
 	.add-form button{cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#1b2431;color:#dbe7ff;padding:6px 10px}
 	.add-form button.primary{background:var(--blue);color:#fff;border:0}
+	#addTaskModal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center}
+	.modal-content{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:400px;width:90%;max-height:90vh;overflow-y:auto}
+	.modal-content h3{margin-top:0}
+	.modal-content label{display:block;margin-bottom:4px;color:var(--muted);font-size:12px}
+	.modal-content input,.modal-content textarea,.modal-content select{width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:12px}
+	.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+	.modal-actions button{padding:8px 16px;border-radius:8px;cursor:pointer}
+	.modal-actions .cancel{background:var(--panel-2);border:1px solid var(--border);color:var(--text)}
+	.modal-actions .submit{background:var(--blue);color:#fff;border:0}
 	@media (max-width:1200px){.board{grid-template-columns:repeat(3,minmax(240px,1fr))}}
 	@media (max-width:800px){.board{grid-template-columns:repeat(2,minmax(240px,1fr))}}
 	@media (max-width:560px){
@@ -78,6 +89,7 @@
 	<header class="app-header">
 		<h1>《結構化拖延任務板》</h1>
 		<div class="actions">
+			<span id="saveStatus"></span>
 			<button id="addTaskBtn" class="secondary">＋ 新增任務</button>
 			<button id="resetBtn" title="清除本地資料並載入範例">重置為範例</button>
 		</div>
@@ -129,34 +141,22 @@
 		</div>
 	</template>
 
-	<div id="addTaskModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
-		<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:400px;width:90%;max-height:90vh;overflow-y:auto">
-			<h3 style="margin-top:0">新增任務</h3>
-			<div style="display:grid;gap:12px">
-				<div>
-					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">類別</label>
-					<select id="modal-category" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></select>
-				</div>
-				<div>
-					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">任務名稱</label>
-					<input id="modal-title" type="text" placeholder="任務名稱" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px">
-				</div>
-				<div>
-					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">狀態</label>
-					<select id="modal-status" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></select>
-				</div>
-				<div>
-					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">優先度</label>
-					<select id="modal-priority" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></select>
-				</div>
-				<div>
-					<label style="display:block;margin-bottom:4px;color:var(--muted);font-size:12px">備註</label>
-					<textarea id="modal-note" rows="3" placeholder="備註（可留空）" style="width:100%;background:#0c131d;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;resize:vertical"></textarea>
-				</div>
-				<div style="display:flex;gap:8px;justify-content:flex-end">
-					<button id="modal-cancel" style="background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 16px;cursor:pointer">取消</button>
-					<button id="modal-submit" style="background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 16px;cursor:pointer">新增</button>
-				</div>
+	<div id="addTaskModal">
+		<div class="modal-content">
+			<h3>新增任務</h3>
+			<label>類別</label>
+			<select id="modal-category"></select>
+			<label>任務名稱</label>
+			<input id="modal-title" type="text" placeholder="任務名稱">
+			<label>狀態</label>
+			<select id="modal-status"></select>
+			<label>優先度</label>
+			<select id="modal-priority"></select>
+			<label>備註</label>
+			<textarea id="modal-note" rows="3" placeholder="備註（可留空）"></textarea>
+			<div class="modal-actions">
+				<button id="modal-cancel" class="cancel">取消</button>
+				<button id="modal-submit" class="submit">新增</button>
 			</div>
 		</div>
 	</div>
@@ -175,7 +175,7 @@
 
 	// 計時器管理
 	const activeTimers = new Map();
-	const taskElements = new Map(); // 儲存任務 DOM 元素，避免重新渲染時丟失狀態
+	const taskElements = new Map();
 
 	// 排序模式：'manual' | 'priority-high' | 'priority-low'
 	let sortModes = {};
@@ -183,6 +183,19 @@
 		const saved = localStorage.getItem(SORT_KEY);
 		if(saved) sortModes = JSON.parse(saved);
 	}catch{}
+
+	// 檢查 localStorage 是否可用
+	function checkLocalStorage(){
+		try{
+			const test = '__localStorage_test__';
+			localStorage.setItem(test, test);
+			localStorage.removeItem(test);
+			return true;
+		}catch(err){
+			console.error('localStorage 不可用:', err);
+			return false;
+		}
+	}
 
 	function formatDuration(ms){
 		const totalSeconds = Math.floor(ms / 1000);
@@ -316,21 +329,120 @@
 		});
 	}
 
+	// 強化的儲存系統
 	const store = {
 		load(){
+			if(!checkLocalStorage()){
+				console.warn('localStorage 不可用，使用範例資料');
+				return seedData();
+			}
+			
 			try{
 				const raw = localStorage.getItem(LS_KEY);
-				if(!raw) return seedData();
+				if(!raw || raw === 'null' || raw === 'undefined'){
+					console.log('無儲存資料，使用範例');
+					return seedData();
+				}
+				
 				const parsed = JSON.parse(raw);
-				return Array.isArray(parsed) ? parsed : seedData();
-			}catch{ return seedData(); }
+				if(!Array.isArray(parsed)){
+					console.warn('資料格式錯誤，使用範例');
+					return seedData();
+				}
+				
+				if(parsed.length === 0){
+					console.log('資料為空，使用範例');
+					return seedData();
+				}
+				
+				console.log('成功載入', parsed.length, '個任務');
+				return normalizeTasks(parsed);
+			}catch(err){
+				console.error('載入資料錯誤:', err);
+				return seedData();
+			}
 		},
 		save(data){ 
-			localStorage.setItem(LS_KEY, JSON.stringify(normalizeTasks(data))); 
+			if(!checkLocalStorage()){
+				console.error('無法儲存：localStorage 不可用');
+				return false;
+			}
+			
+			try{
+				if(!data || !Array.isArray(data)){
+					console.error('無效的資料格式');
+					return false;
+				}
+				
+				const normalized = normalizeTasks(data);
+				const json = JSON.stringify(normalized);
+				
+				if(json.length > 5000000){
+					console.warn('資料過大，可能無法儲存');
+				}
+				
+				localStorage.setItem(LS_KEY, json);
+				console.log('成功儲存', normalized.length, '個任務');
+				return true;
+			}catch(err){
+				console.error('儲存資料錯誤:', err);
+				if(err.name === 'QuotaExceededError'){
+					alert('儲存空間不足！請刪除一些任務或清理瀏覽器快取。');
+				}else{
+					console.error('儲存失敗：', err.message);
+				}
+				return false;
+			}
 		}
 	};
 
-	let tasks = normalizeTasks(store.load());
+	// 改進的 persist 函數（含狀態顯示）
+	function persist(){
+		const statusEl = document.getElementById('saveStatus');
+		
+		try{
+			if(statusEl){
+				statusEl.textContent = '儲存中...';
+				statusEl.className = 'saving';
+			}
+			
+			const saved = store.save(tasks);
+			
+			if(statusEl){
+				if(saved){
+					statusEl.textContent = '已儲存';
+					statusEl.className = 'saved';
+					setTimeout(()=>{
+						if(statusEl && statusEl.textContent === '已儲存'){
+							statusEl.textContent = '';
+							statusEl.className = '';
+						}
+					}, 2000);
+				}else{
+					statusEl.textContent = '儲存失敗';
+					statusEl.className = 'error';
+					setTimeout(()=>{
+						if(statusEl && statusEl.className === 'error'){
+							statusEl.textContent = '';
+							statusEl.className = '';
+						}
+					}, 3000);
+				}
+			}
+			
+			return saved;
+		}catch(err){
+			console.error('persist 錯誤:', err);
+			if(statusEl){
+				statusEl.textContent = '錯誤';
+				statusEl.className = 'error';
+			}
+			return false;
+		}
+	}
+
+	// 初始化 tasks
+	let tasks = [];
 
 	const el = {
 		board: document.getElementById('board'),
@@ -418,7 +530,9 @@
 					if(list){
 						list.innerHTML = '';
 						getSortedTasks(catKey, tasks.filter(t=>t.category===catKey)).forEach(t=>{
-							list.appendChild(renderTask(t));
+							const taskEl = renderTask(t);
+							list.appendChild(taskEl);
+							taskElements.set(t.id, taskEl);
 						});
 					}
 				});
@@ -454,96 +568,26 @@
 		return tasks.filter(t=>t.category===catKey);
 	}
 
-	function updateTaskInDOM(task){
-		const taskEl = taskElements.get(task.id);
-		if(!taskEl) return;
-
-		// 更新優先度顏色
-		const dot = taskEl.querySelector('.priority-dot');
-		if(dot) dot.style.background = priorityColor(task.priority);
-
-		// 更新狀態和優先度選擇器
-		const statusSel = taskEl.querySelector('.task-status');
-		if(statusSel && statusSel.value !== task.status) statusSel.value = task.status;
-		const prioSel = taskEl.querySelector('.task-priority');
-		if(prioSel && prioSel.value !== task.priority) prioSel.value = task.priority;
-
-		// 更新標題和備註
-		const title = taskEl.querySelector('.task-title');
-		if(title && title.value !== task.title) title.value = task.title;
-		const note = taskEl.querySelector('.task-note');
-		if(note && note.value !== task.note) note.value = task.note || '';
-
-		// 更新子步驟列表（只更新必要的部分，避免重置狀態）
-		const subtasksList = taskEl.querySelector('.subtasks-list');
-		if(subtasksList){
-			const existingSubtasks = Array.from(subtasksList.children);
-			const currentIds = new Set((task.subtasks||[]).map(st=>st.id));
-
-			// 移除不存在的子步驟
-			existingSubtasks.forEach(el=>{
-				const subId = el.dataset.subId;
-				if(subId && !currentIds.has(subId)){
-					const st = findSubtaskById(task, subId);
-					if(st){
-						stopSubtaskTimer(st, 
-							el.querySelector('.time-display'),
-							el.querySelector('.time-btn.start'),
-							el.querySelector('.time-btn.stop')
-						);
-					}
-					el.remove();
-				}
-			});
-
-			// 添加新的子步驟或更新現有的
-			(task.subtasks||[]).forEach(st=>{
-				const existing = subtasksList.querySelector(`[data-sub-id="${st.id}"]`);
-				if(existing){
-					// 更新現有子步驟的文字和狀態，但保留計時器狀態
-					const txt = existing.querySelector('input[type="text"]');
-					if(txt && txt.value !== st.text) txt.value = st.text;
-					const chk = existing.querySelector('input[type="checkbox"]');
-					if(chk && chk.checked !== st.done) chk.checked = st.done;
-				}else{
-					// 添加新子步驟
-					subtasksList.appendChild(renderSubtask(task, st));
-				}
-			});
-		}
-	}
-
-	function findSubtaskById(task, subId){
-		return (task.subtasks||[]).find(st=>st.id === subId);
-	}
-
 	function renderTask(task){
-		// 檢查是否已有 DOM 元素，如果有且任務數據未變，則重用
-		let node = taskElements.get(task.id);
-		if(node && node.parentElement){
-			updateTaskInDOM(task);
-			return node;
-		}
-
-		node = el.taskTpl.content.firstElementChild.cloneNode(true);
+		const node = el.taskTpl.content.firstElementChild.cloneNode(true);
 		node.dataset.id = task.id;
 
 		const title = node.querySelector('.task-title');
-		title.value = task.title;
+		title.value = task.title || '';
 		title.addEventListener('input', e=>{
 			task.title = e.target.value.trim();
 			persist();
 		});
 
 		const statusSel = node.querySelector('.task-status');
-		statusSel.value = task.status;
+		statusSel.value = task.status || STATUS[0];
 		statusSel.addEventListener('change', e=>{
 			task.status = e.target.value;
 			persist();
 		});
 
 		const prioSel = node.querySelector('.task-priority');
-		prioSel.value = task.priority;
+		prioSel.value = task.priority || PRIORITY[1];
 		prioSel.addEventListener('change', e=>{
 			task.priority = e.target.value;
 			node.querySelector('.priority-dot').style.background = priorityColor(task.priority);
@@ -565,10 +609,10 @@
 
 		// Subtasks
 		const list = node.querySelector('.subtasks-list');
-		(task.subtasks||[]).forEach(st=> list.appendChild(renderSubtask(task, st)));
+		if(!task.subtasks) task.subtasks = [];
+		task.subtasks.forEach(st=> list.appendChild(renderSubtask(task, st)));
 		node.querySelector('.add-subtask').addEventListener('click', ()=>{
 			const st = { id:crypto.randomUUID(), text:'', done:false, elapsedMs:0, running:false, startedAt:null };
-			if(!task.subtasks) task.subtasks = [];
 			task.subtasks.push(st);
 			list.appendChild(renderSubtask(task, st));
 			persist();
@@ -642,7 +686,7 @@
 		rm.addEventListener('click', ()=>{
 			if(confirm('刪除這個子步驟？')){
 				stopSubtaskTimer(st, display, startBtn, stopBtn);
-				// 直接從任務的子步驟陣列中移除，不重新渲染整個任務
+				// 直接從任務的子步驟陣列中移除
 				task.subtasks = task.subtasks.filter(s=>s.id!==st.id);
 				row.remove();
 				persist();
@@ -717,6 +761,8 @@
 			return;
 		}
 		const category = el.modalCategory.value;
+		const categoryTasks = getTasksByCategory(category);
+		const maxOrder = categoryTasks.length > 0 ? Math.max(...categoryTasks.map(t=>t.order || 0)) : -1;
 		const t = {
 			id: crypto.randomUUID(),
 			category,
@@ -725,7 +771,7 @@
 			priority: el.modalPriority.value,
 			note: el.modalNote.value,
 			subtasks: [],
-			order: (getTasksByCategory(category).length > 0 ? Math.max(...getTasksByCategory(category).map(t=>t.order)) + 1 : 0)
+			order: maxOrder + 1
 		};
 		tasks.push(t);
 		persist();
@@ -809,11 +855,19 @@
 	}
 
 	/* ---------- Persistence & Init ---------- */
-	function persist(){
-		store.save(tasks);
-	}
-
 	function init(){
+		// 檢查 localStorage
+		if(!checkLocalStorage()){
+			alert('瀏覽器不支援 localStorage 或已被停用。\n請檢查瀏覽器設定，或不要在隱私/無痕模式下使用。');
+		}
+		
+		// 載入資料
+		tasks = store.load();
+		console.log('初始化完成，載入', tasks.length, '個任務');
+		
+		// 立即儲存一次，確保資料已寫入
+		persist();
+		
 		el.resetBtn.addEventListener('click', ()=>{
 			if(confirm('將清除目前資料並載入範例，確定？')){
 				// 停止所有計時器
@@ -826,14 +880,29 @@
 			}
 		});
 
+		// 離開頁面前確保儲存
 		window.addEventListener('beforeunload', ()=>{
+			persist();
 			[...activeTimers.values()].forEach(handle=>clearInterval(handle));
 			activeTimers.clear();
+		});
+
+		// 定期自動儲存（每30秒）
+		setInterval(()=>{
+			persist();
+		}, 30000);
+		
+		// 頁面可見性變化時儲存
+		document.addEventListener('visibilitychange', ()=>{
+			if(document.hidden){
+				persist();
+			}
 		});
 
 		render();
 	}
 
+	// DOM 載入完成後初始化
 	document.addEventListener('DOMContentLoaded', init);
 	</script>
 </body>
